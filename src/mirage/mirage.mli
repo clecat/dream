@@ -1,10 +1,10 @@
-type incoming
-type outgoing
+type client
+type server
 
 type 'a message
 
-type request = incoming message
-type response = outgoing message
+type request = client message
+type response = server message
 
 type handler = request -> response Lwt.t
 type middleware = handler -> handler
@@ -96,6 +96,10 @@ module Make
     [ standard_status
     | `Status of int ]
 
+  type 'a local
+
+  val method_to_string : [< method_ ] -> string
+
   val random : int -> string
 
   val log : ('a, Format.formatter, unit, unit) format4 -> 'a
@@ -107,14 +111,35 @@ module Make
 
   type log_level = [ `Error | `Warning | `Info | `Debug ]
 
+  val initialize_log :
+    ?backtraces:bool ->
+    ?async_exception_hook:bool ->
+    ?level:[< log_level ] ->
+    ?enable:bool ->
+      unit -> unit
+
   val error     : ('a, unit) conditional_log
   val warning   : ('a, unit) conditional_log
   val info      : ('a, unit) conditional_log
   (* val debug     : ('a, unit) conditional_log *)
 
+  val client : request -> string
+  val method_ : request -> method_
+  val target : request -> string
+
+  val header : string -> 'a message -> string option
+  val body : 'a message -> string Lwt.t
+  val query : string -> request -> string option
+  val queries : string -> request -> string list
+
   val html : ?status:status -> ?code:int -> ?headers:(string * string) list -> string -> response Lwt.t
+  val json : ?status:status -> ?code:int -> ?headers:(string * string) list -> string -> response Lwt.t
 
   val param : string -> request -> string
+
+  val new_local : ?name:string -> ?show_value:('a -> string) -> unit -> 'a local
+  val local : 'a local -> 'b message -> 'a option
+  val with_local : 'a local -> 'a -> 'b message -> 'b message
 
   type csrf_result =
     [ `Ok
@@ -151,10 +176,21 @@ module Make
   val content_length : middleware
 
   val logger : middleware
+  val log : ('a, Format.formatter, unit, unit) format4 -> 'a
+
   val router : route list -> middleware
+  val scope : string -> middleware list -> route list -> route
 
   val get : string -> handler -> route
-  val not_found : handler
+  val post    : string -> handler -> route
+  val put     : string -> handler -> route
+  val delete  : string -> handler -> route
+  val head    : string -> handler -> route
+  val connect : string -> handler -> route
+  val options : string -> handler -> route
+  val trace   : string -> handler -> route
+  val patch   : string -> handler -> route
+    val not_found : handler
 
   type error =
     { condition :
@@ -174,13 +210,12 @@ module Make
     ; response : response option
     ; client : string option
     ; severity : log_level
-    ; debug : bool
     ; will_send_response : bool }
 
   type error_handler = error -> response option Lwt.t
 
   val error_template :
-    (string option -> response -> response Lwt.t) -> error_handler
+    (error -> string -> response -> response Lwt.t) -> error_handler
 
   val https :
        ?stop:Lwt_switch.t

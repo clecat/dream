@@ -1,4 +1,4 @@
-module Dream = Dream__pure.Inmost
+module Dream = Dream_pure
 
 open Rresult
 open Lwt.Infix
@@ -10,7 +10,7 @@ let sha1 str = Digestif.SHA1.(to_raw_string (digest_string str))
 let const x = fun _ -> x
 let ( >>? ) = Lwt_result.bind
 
-let wrap_handler_httpaf app _user's_error_handler user's_dream_handler =
+let wrap_handler_httpaf _user's_error_handler user's_dream_handler =
   let httpaf_request_handler = fun client reqd ->
     let httpaf_request = Httpaf.Reqd.request reqd in
     let method_ = to_dream_method httpaf_request.meth in
@@ -28,9 +28,12 @@ let wrap_handler_httpaf app _user's_error_handler user's_dream_handler =
     let close _close =
       Httpaf.Body.Reader.close body in
     let body =
-      Dream__pure.Stream.read_only ~read ~close in
+      Dream_pure.Stream.reader ~read ~close in
 
-    let request = Dream.request_from_http ~app ~client ~method_ ~target ~version ~headers body in
+    let client_stream = Dream.Stream.(stream no_reader no_writer) in
+    let server_stream = Dream.Stream.(stream body no_writer) in
+
+    let request = Dream.request ~method_ ~target ~version ~headers client_stream server_stream in
 
     (* Call the user's handler. If it raises an exception or returns a promise
        that rejects with an exception, pass the exception up to Httpaf. This
@@ -93,31 +96,29 @@ let wrap_handler_httpaf app _user's_error_handler user's_dream_handler =
   httpaf_request_handler
 
 let request_handler
-  : Dream.app -> Dream.error_handler -> Dream.handler -> string -> Alpn.reqd -> unit
-  = fun app
-      (user's_error_handler : Dream.error_handler)
+  : Dream__middleware.Catch.error_handler -> Dream.handler -> string -> Alpn.reqd -> unit
+  = fun (user's_error_handler : Dream__middleware.Catch.error_handler)
       (user's_dream_handler : Dream.handler) -> ();
     fun client_address -> function
-    | Alpn.Reqd_HTTP_1_1 reqd -> wrap_handler_httpaf app user's_error_handler user's_dream_handler client_address reqd
+    | Alpn.Reqd_HTTP_1_1 reqd -> wrap_handler_httpaf user's_error_handler user's_dream_handler client_address reqd
     | _ -> assert false
 
 let error_handler
-  : Dream.app -> Dream.error_handler -> string -> ?request:Alpn.request -> Alpn.server_error ->
+  : Dream__middleware.Catch.error_handler -> string -> ?request:Alpn.request -> Alpn.server_error ->
     (Alpn.headers -> Alpn.body) -> unit
-  = fun app
-      (user's_error_handler : Dream.error_handler) -> ();
+  = fun (user's_error_handler : Dream__middleware.Catch.error_handler) -> ();
     fun client ?request error start_response ->
   match request with
   | Some (Alpn.Request_HTTP_1_1 request) ->
     let start_response hdrs : Httpaf.Body.Writer.t = match start_response Alpn.(Headers_HTTP_1_1 hdrs) with
       | Alpn.Body_HTTP_1_1 (Alpn.Wr, Alpn.Body_wr body) -> body
       | _ -> Fmt.failwith "Impossible to respond with an h2 respond to an HTTP/1.1 client" in
-    Error_handler.httpaf app user's_error_handler client ?request:(Some request) error start_response
+    Error_handler.httpaf user's_error_handler client ?request:(Some request) error start_response
   | _ -> assert false (* TODO *)
 
 module Make (Pclock : Mirage_clock.PCLOCK) (Time : Mirage_time.S) (Stack : Mirage_stack.V4V6) = struct
-  include Dream__pure.Stream
-  include Dream__pure.Inmost
+  include Dream_pure.Stream
+  include Dream_pure
 
   include Dream__middleware.Log
   include Dream__middleware.Log.Make (Pclock)
@@ -146,8 +147,8 @@ module Make (Pclock : Mirage_clock.PCLOCK) (Time : Mirage_time.S) (Stack : Mirag
   
   include Dream__middleware.Lowercase_headers
   include Dream__middleware.Catch
-  include Dream__middleware.Request_id
   include Dream__middleware.Site_prefix
+  include Dream__middleware.Query
 
   let error_template =
     Error_handler.customize
@@ -155,12 +156,21 @@ module Make (Pclock : Mirage_clock.PCLOCK) (Time : Mirage_time.S) (Stack : Mirag
   let random =
     Dream__cipher.Random.random
 
-  include Dream__pure.Formats
+  include Dream_pure.Formats
 
   let log =
     Dream__middleware.Log.convenience_log
 
   include Dream__middleware.Tag
+
+  let respond ?status ?code ?headers body =
+    let client_stream = stream (string body) no_writer
+    and server_stream = stream no_reader no_writer in
+    response ?status ?code ?headers client_stream server_stream
+    |> Lwt.return
+
+  let not_found _ =
+    respond ~status:`Not_Found ""
 
   let now () = Ptime.to_float_s (Ptime.v (Pclock.now_d_ps ()))
 
@@ -169,8 +179,19 @@ module Make (Pclock : Mirage_clock.PCLOCK) (Time : Mirage_time.S) (Stack : Mirag
   let csrf_token = csrf_token ~now
   let verify_csrf_token = verify_csrf_token ~now
   let form_tag = form_tag ~now
-  
-  include Dream__pure.Formats
+
+  let client =
+    Dream__middleware.Server.client
+  let with_client =
+    Dream__middleware.Server.with_client
+  let https =
+    Dream__middleware.Server.https
+  let html =
+    Dream__middleware.Server.html
+  let json =
+    Dream__middleware.Server.json
+
+  include Dream_pure.Formats
 
   include Paf_mirage.Make (Time) (Stack)
 
@@ -183,13 +204,12 @@ module Make (Pclock : Mirage_clock.PCLOCK) (Time : Mirage_time.S) (Stack : Mirag
     let injection (_, flow) = R.T flow in
     { Alpn.alpn; peer; injection; }
 
-  let built_in_middleware =
-    Dream__pure.Inmost.pipeline [
+  let built_in_middleware prefix error_handler =
+    Dream_pure.pipeline [
       Dream__middleware.Lowercase_headers.lowercase_headers;
       Dream__middleware.Content_length.content_length;
-      Dream__middleware.Catch.catch_errors;
-      Dream__middleware.Request_id.assign_request_id;
-      Dream__middleware.Site_prefix.chop_site_prefix;
+      Dream__middleware.Catch.catch (Error_handler.app error_handler);
+      Dream__middleware.Site_prefix.with_site_prefix prefix;
     ]
 
   let localhost_certificate =
@@ -202,21 +222,17 @@ module Make (Pclock : Mirage_clock.PCLOCK) (Time : Mirage_time.S) (Stack : Mirag
   let https ?stop ~port ?(prefix= "") stack
     ?(cfg= Tls.Config.server ~certificates:localhost_certificate ())
     ?error_handler:(user's_error_handler : error_handler = Error_handler.default) (user's_dream_handler : handler) =
-    let prefix = prefix
-      |> Dream__pure.Formats.from_path
-      |> Dream__pure.Formats.drop_trailing_slash in
     initialize ~setup_outputs:ignore ;    
-    let app = Dream__pure.Inmost.new_app (Error_handler.app user's_error_handler) prefix in
     let accept t = accept t >>? fun flow ->
       let edn = Stack.TCP.dst flow in
       TLS.server_of_flow cfg flow >>= function
       | Ok flow -> Lwt.return_ok (edn, flow)
       | Error err -> Lwt.return (R.error_msgf "%a" TLS.pp_write_error err) in
     let user's_dream_handler =
-      built_in_middleware user's_dream_handler in
-    let error_handler = error_handler app user's_error_handler in
+      built_in_middleware prefix user's_error_handler user's_dream_handler in
+    let error_handler = error_handler user's_error_handler in
     let request_handler =
-      request_handler app user's_error_handler user's_dream_handler in
+      request_handler user's_error_handler user's_dream_handler in
     let service = Alpn.service alpn ~error_handler ~request_handler accept close in
     init ~port stack >>= fun t ->
     let `Initialized th = serve ?stop service t in th
@@ -234,18 +250,14 @@ module Make (Pclock : Mirage_clock.PCLOCK) (Time : Mirage_time.S) (Stack : Mirag
   let http ?stop ~port ?(prefix= "") ?(protocol= `HTTP_1_1) stack
     ?error_handler:(user's_error_handler= Error_handler.default)
     user's_dream_handler =
-    let prefix = prefix
-      |> Dream__pure.Formats.from_path
-      |> Dream__pure.Formats.drop_trailing_slash in
     initialize ~setup_outputs:ignore ;
-    let app = Dream__pure.Inmost.new_app (Error_handler.app user's_error_handler) prefix in
     let accept t = accept t >>? fun flow ->
       let edn = Stack.TCP.dst flow in
       Lwt.return_ok (edn, flow) in
     let user's_dream_handler =
-      built_in_middleware user's_dream_handler in
-    let error_handler = error_handler app user's_error_handler in
-    let request_handler = request_handler app user's_error_handler user's_dream_handler in
+      built_in_middleware prefix user's_error_handler user's_dream_handler in
+    let error_handler = error_handler user's_error_handler in
+    let request_handler = request_handler user's_error_handler user's_dream_handler in
     let service = Alpn.service (alpn protocol) ~error_handler ~request_handler accept close in
     init ~port stack >>= fun t ->
     let `Initialized th = serve ?stop service t in th

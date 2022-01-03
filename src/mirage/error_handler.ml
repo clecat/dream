@@ -1,4 +1,5 @@
-module Dream = Dream__pure.Inmost
+module Dream = Dream_pure
+module Catch = Dream__middleware.Catch
 
 let log =
   Dream__middleware.Log.sub_log "dream.mirage"
@@ -9,7 +10,7 @@ let select_log = function
   | `Info -> log.info
   | `Debug -> log.debug
 
-let dump (error : Dream.error) =
+let dump (error : Catch.error) =
   let buffer = Buffer.create 4096 in
   let p format = Printf.bprintf buffer format in
 
@@ -88,13 +89,12 @@ let dump (error : Dream.error) =
         request
       |> ignore
     in
-    show_variables Dream.fold_locals;
-    show_variables Dream.fold_globals
+    show_variables Dream.fold_locals
   end;
 
   Buffer.contents buffer
 
-let customize template (error : Dream.error) =
+let customize template (error : Catch.error) =
 
   (* First, log the error. *)
 
@@ -135,18 +135,14 @@ let customize template (error : Dream.error) =
   end;
 
   (* If Dream will not send a response for this error, we are done after
-     logging. Otherwise, if debugging is enabled, gather a bunch of information.
-     Then, call the template, and return the response. *)
+      logging. Otherwise, if debugging is enabled, gather a bunch of information.
+      Then, call the template, and return the response. *)
 
   if not error.will_send_response then
     Lwt.return_none
 
   else
-    let debug_dump =
-      match error.debug with
-      | false -> None
-      | true -> Some (dump error)
-    in
+    let debug_dump = dump error in
 
     let response =
       match error.condition with
@@ -157,35 +153,47 @@ let customize template (error : Dream.error) =
           | `Server -> `Internal_Server_Error
           | `Client -> `Bad_Request
         in
-        Dream.response ~status ""
+        (* TODO Simplify the streams creation. *)
+        let client_stream = Dream.Stream.(stream empty no_writer)
+        and server_stream = Dream.Stream.(stream no_reader no_writer) in
+        Dream.response ~status client_stream server_stream
     in
 
     (* No need to catch errors when calling the template, because every call
-       site of the error handler already has error handlers for catching double
-       faults. *)
+        site of the error handler already has error handlers for catching double
+        faults. *)
     response
-    |> template debug_dump
+    |> template error debug_dump
     |> Lwt.map (fun response -> Some response)
 
 let default_response = function
-  | `Server -> Dream.response ~status:`Internal_Server_Error ""
-  | `Client -> Dream.response ~status:`Bad_Request ""
+  | `Server ->
+    let client_stream = Dream.Stream.(stream empty no_writer)
+    and server_stream = Dream.Stream.(stream no_reader no_writer) in
+    Dream.response ~status:`Internal_Server_Error client_stream server_stream
+  | `Client ->
+    let client_stream = Dream.Stream.(stream empty no_writer)
+    and server_stream = Dream.Stream.(stream no_reader no_writer) in
+    Dream.response ~status:`Bad_Request client_stream server_stream
 
-let default_template debug_dump response =
-  match debug_dump with
-  | None -> Lwt.return response
-  | Some debug_dump ->
-    let status = Dream.status response in
-    let code = Dream.status_to_int status
-    and reason = Dream.status_to_string status in
-    response
-    |> Dream.with_header "Content-Type" Dream__pure.Formats.text_html
-    |> Dream.with_body
-      (Dream__middleware.Error_template.render ~debug_dump ~code ~reason)
-    |> Lwt.return
+let default_template _error _debug_dump response =
+  Lwt.return response
+
+let debug_template _error debug_dump response =
+  let status = Dream.status response in
+  let code = Dream.status_to_int status
+  and reason = Dream.status_to_string status in
+  response
+  |> Dream.with_header "Content-Type" Dream_pure.Formats.text_html
+  |> Dream.with_body
+    (Dream__middleware.Error_template.render ~debug_dump ~code ~reason)
+  |> Lwt.return
 
 let default =
   customize default_template
+
+let debug_error_handler =
+  customize debug_template
 
 let double_faults f default =
   Lwt.catch f begin fun exn ->
@@ -197,7 +205,7 @@ let double_faults f default =
     default ()
   end
 
-let httpaf app user's_error_handler = fun client_address ?request:_ error start_response ->
+let httpaf user's_error_handler = fun client_address ?request:_ error start_response ->
   let condition, severity, caused_by = match error with
     | `Exn exn ->
       `Exn exn,
@@ -213,14 +221,13 @@ let httpaf app user's_error_handler = fun client_address ?request:_ error start_
       `Error,
       `Server in
   let error = {
-    Dream.condition;
+    Catch.condition;
     layer = `HTTP;
     caused_by;
     request = None;
     response = None;
-    client= Some client_address;
+    client = Some client_address;
     severity;
-    debug = Dream.debug app;
     will_send_response = true;
   } in
 
@@ -241,12 +248,22 @@ let httpaf app user's_error_handler = fun client_address ?request:_ error start_
 let respond_with_option f =
   double_faults
     (fun () ->
-       f ()
-       |> Lwt.map (function
-         | Some response -> response
-         | None -> Dream.response ~status:`Internal_Server_Error ""))
+      f ()
+      |> Lwt.map (function
+        | Some response -> response
+        | None ->
+          (* TODO Simplify streams. *)
+          let client_stream = Dream.Stream.(stream empty no_writer)
+          and server_stream = Dream.Stream.(stream no_reader no_writer) in
+          Dream.response
+            ~status:`Internal_Server_Error client_stream server_stream))
     (fun () ->
-       Dream.empty `Internal_Server_Error)
+      (* TODO Simplify streams. *)
+      let client_stream = Dream.Stream.(stream empty no_writer)
+      and server_stream = Dream.Stream.(stream no_reader no_writer) in
+      Dream.response
+        ~status:`Internal_Server_Error client_stream server_stream
+      |> Lwt.return)
 
 let app user's_error_handler = fun error ->
   respond_with_option (fun () -> user's_error_handler error)

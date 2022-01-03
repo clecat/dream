@@ -6,8 +6,8 @@
    XXX(dinosaure): same as [src/http/adapt.ml] without [address_to_string] - which
    depends on [Unix]. *)
 
-module Dream = Dream__pure.Inmost
-module Stream = Dream__pure.Stream
+module Dream = Dream_pure
+module Stream = Dream_pure.Stream
 
 (* TODO Write a test simulating client exit during SSE; this was killing the
    server at some point. *)
@@ -16,13 +16,13 @@ module Stream = Dream__pure.Stream
 let forward_body_general
     (response : Dream.response)
     (_write_string : ?off:int -> ?len:int -> string -> unit)
-    (write_buffer : ?off:int -> ?len:int -> Stream.buffer -> unit)
+    (write_buffer : ?off:int -> ?len:int -> Dream.buffer -> unit)
     http_flush
     close =
   let bytes_since_flush = ref 0 in
 
   let rec send () =
-    Dream.body_stream response
+    Dream.client_stream response
     |> fun stream ->
       Stream.read
         stream
