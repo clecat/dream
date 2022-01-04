@@ -122,6 +122,9 @@ module Make (Pclock : Mirage_clock.PCLOCK) (Time : Mirage_time.S) (Stack : Mirag
 
   include Dream__middleware.Log
   include Dream__middleware.Log.Make (Pclock)
+
+  let () = initialize ~setup_outputs:ignore
+
   include Dream__middleware.Echo
   
   let default_log =
@@ -222,7 +225,6 @@ module Make (Pclock : Mirage_clock.PCLOCK) (Time : Mirage_time.S) (Stack : Mirag
   let https ?stop ~port ?(prefix= "") stack
     ?(cfg= Tls.Config.server ~certificates:localhost_certificate ())
     ?error_handler:(user's_error_handler : error_handler = Error_handler.default) (user's_dream_handler : handler) =
-    initialize ~setup_outputs:ignore ;    
     let accept t = accept t >>? fun flow ->
       let edn = Stack.TCP.dst flow in
       TLS.server_of_flow cfg flow >>= function
@@ -250,7 +252,6 @@ module Make (Pclock : Mirage_clock.PCLOCK) (Time : Mirage_time.S) (Stack : Mirag
   let http ?stop ~port ?(prefix= "") ?(protocol= `HTTP_1_1) stack
     ?error_handler:(user's_error_handler= Error_handler.default)
     user's_dream_handler =
-    initialize ~setup_outputs:ignore ;
     let accept t = accept t >>? fun flow ->
       let edn = Stack.TCP.dst flow in
       Lwt.return_ok (edn, flow) in
