@@ -11,8 +11,8 @@
   dream-pure
   dream.dream-gluten
   dream.dream-gluten-lwt-unix
-  dream.dream-h2
-  dream.dream-h2-lwt-unix
+  dream.h2
+  dream.h2-lwt-unix
   dream.dream-httpaf
   dream.dream-httpaf-lwt-unix
   lwt

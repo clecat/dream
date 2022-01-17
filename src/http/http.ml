@@ -302,7 +302,7 @@ let wrap_handler
     (user's_error_handler : Dream.error_handler)
     (user's_dream_handler : Dream.handler) =
 
-  let httpaf_request_handler = fun client_address (conn : _ Gluten.Reqd.t) ->
+  let httpaf_request_handler = fun client_address (conn : _ Dream_gluten.Reqd.t) ->
     Dream__middleware.Log.set_up_exception_hook ();
 
     let conn, upgrade = conn.reqd, conn.upgrade in
@@ -416,7 +416,7 @@ let wrap_handler
           let proceed () =
             Websocketaf.Server_connection.create_websocket
               ~error_handler (websocket_handler user's_websocket_handler)
-            |> Gluten.make (module Websocketaf.Server_connection)
+            |> Dream_gluten.make (module Websocketaf.Server_connection)
             |> upgrade
           in
 
@@ -593,7 +593,7 @@ let openssl = {
     in
 
     let perform_tls_handshake =
-      Gluten_lwt_unix.Server.SSL.create_default
+      Dream_gluten_lwt_unix.Server.SSL.create_default
         ~alpn_protocols:["h2"; "http/1.1"]
         ~certfile:certificate_file
         ~keyfile:key_file
