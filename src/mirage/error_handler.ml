@@ -237,7 +237,7 @@ let httpaf user's_error_handler = fun client_address ?request:_ error start_resp
       let response = match response with
         | Some response -> response
         | None -> default_response caused_by in
-      let headers = Httpaf.Headers.of_list (Dream.all_headers response) in
+      let headers = Dream_httpaf.Headers.of_list (Dream.all_headers response) in
       let body = start_response headers in
       Adapt.forward_body response body;
       Lwt.return_unit

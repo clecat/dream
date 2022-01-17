@@ -283,7 +283,7 @@ let httpaf
     user's_error_handler =
     fun client_address ?request error start_response ->
 
-  ignore (request : Httpaf.Request.t option);
+  ignore (request : Dream_httpaf.Request.t option);
   (* TODO LATER Should factor out the request translation function and use it to
      partially recover the request info. *)
 
@@ -327,7 +327,7 @@ let httpaf
         | None -> default_response caused_by
       in
 
-      let headers = Httpaf.Headers.of_list (Dream.all_headers response) in
+      let headers = Dream_httpaf.Headers.of_list (Dream.all_headers response) in
       let body = start_response headers in
 
       Adapt.forward_body response body;

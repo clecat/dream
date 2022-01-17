@@ -3,8 +3,8 @@ module Dream = Dream_pure
 open Rresult
 open Lwt.Infix
 
-let to_dream_method meth = Httpaf.Method.to_string meth |> Dream.string_to_method
-let to_httpaf_status status = Dream.status_to_int status |> Httpaf.Status.of_code
+let to_dream_method meth = Dream_httpaf.Method.to_string meth |> Dream.string_to_method
+let to_httpaf_status status = Dream.status_to_int status |> Dream_httpaf.Status.of_code
 let to_h2_status status = Dream.status_to_int status |> H2.Status.of_code
 let sha1 str = Digestif.SHA1.(to_raw_string (digest_string str))
 let const x = fun _ -> x
@@ -12,21 +12,21 @@ let ( >>? ) = Lwt_result.bind
 
 let wrap_handler_httpaf _user's_error_handler user's_dream_handler =
   let httpaf_request_handler = fun client reqd ->
-    let httpaf_request = Httpaf.Reqd.request reqd in
+    let httpaf_request = Dream_httpaf.Reqd.request reqd in
     let method_ = to_dream_method httpaf_request.meth in
     let target  = httpaf_request.target in
     let version = (httpaf_request.version.major, httpaf_request.version.minor) in
-    let headers = Httpaf.Headers.to_list httpaf_request.headers in
-    let body    = Httpaf.Reqd.request_body reqd in
+    let headers = Dream_httpaf.Headers.to_list httpaf_request.headers in
+    let body    = Dream_httpaf.Reqd.request_body reqd in
 
     let read ~data ~close ~flush:_ ~ping:_ ~pong:_ =
-      Httpaf.Body.Reader.schedule_read
+      Dream_httpaf.Body.Reader.schedule_read
         body
         ~on_eof:(fun () -> close 1000)
         ~on_read:(fun buffer ~off ~len -> data buffer off len true false)
     in
     let close _close =
-      Httpaf.Body.Reader.close body in
+      Dream_httpaf.Body.Reader.close body in
     let body =
       Dream_pure.Stream.reader ~read ~close in
 
@@ -36,7 +36,7 @@ let wrap_handler_httpaf _user's_error_handler user's_dream_handler =
     let request = Dream.request ~method_ ~target ~version ~headers client_stream server_stream in
 
     (* Call the user's handler. If it raises an exception or returns a promise
-       that rejects with an exception, pass the exception up to Httpaf. This
+       that rejects with an exception, pass the exception up to Dream_httpaf. This
        will cause it to call its (low-level) error handler with variand `Exn _.
        A well-behaved Dream app should catch all of its own exceptions and
        rejections in one of its top-level middlewares.
@@ -61,12 +61,12 @@ let wrap_handler_httpaf _user's_error_handler user's_dream_handler =
               transmit the resulting error response. *)
         let forward_response response =
           let headers =
-            Httpaf.Headers.of_list (Dream.all_headers response) in
+            Dream_httpaf.Headers.of_list (Dream.all_headers response) in
 
           (* let version =
             match Dream.version_override response with
             | None -> None
-            | Some (major, minor) -> Some Httpaf.Version.{major; minor}
+            | Some (major, minor) -> Some Dream_httpaf.Version.{major; minor}
           in *)
           let status =
             to_httpaf_status (Dream.status response) in
@@ -74,9 +74,9 @@ let wrap_handler_httpaf _user's_error_handler user's_dream_handler =
             Dream.reason_override response in *)
 
           let httpaf_response =
-            Httpaf.Response.create ~headers status in
+            Dream_httpaf.Response.create ~headers status in
           let body =
-            Httpaf.Reqd.respond_with_streaming reqd httpaf_response in
+            Dream_httpaf.Reqd.respond_with_streaming reqd httpaf_response in
 
           Adapt.forward_body response body;
 
@@ -88,7 +88,7 @@ let wrap_handler_httpaf _user's_error_handler user's_dream_handler =
       @@ fun exn ->
         (* TODO LATER There was something in the fork changelogs about not
            requiring report_exn. Is it relevant to this? *)
-        Httpaf.Reqd.report_exn reqd exn;
+        Dream_httpaf.Reqd.report_exn reqd exn;
         Lwt.return_unit
     end
   in
@@ -110,7 +110,7 @@ let error_handler
     fun client ?request error start_response ->
   match request with
   | Some (Alpn.Request_HTTP_1_1 request) ->
-    let start_response hdrs : Httpaf.Body.Writer.t = match start_response Alpn.(Headers_HTTP_1_1 hdrs) with
+    let start_response hdrs : Dream_httpaf.Body.Writer.t = match start_response Alpn.(Headers_HTTP_1_1 hdrs) with
       | Alpn.Body_HTTP_1_1 (Alpn.Wr, Alpn.Body_wr body) -> body
       | _ -> Fmt.failwith "Impossible to respond with an h2 respond to an HTTP/1.1 client" in
     Error_handler.httpaf user's_error_handler client ?request:(Some request) error start_response

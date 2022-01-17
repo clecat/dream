@@ -20,10 +20,10 @@ module Server = Dream__middleware.Server
 
 
 let to_dream_method method_ =
-  Httpaf.Method.to_string method_ |> Dream.string_to_method
+  Dream_httpaf.Method.to_string method_ |> Dream.string_to_method
 
 let to_httpaf_status status =
-  Dream.status_to_int status |> Httpaf.Status.of_code
+  Dream.status_to_int status |> Dream_httpaf.Status.of_code
 
 let to_h2_status status =
   Dream.status_to_int status |> H2.Status.of_code
@@ -308,8 +308,8 @@ let wrap_handler
     let conn, upgrade = conn.reqd, conn.upgrade in
 
     (* Covert the http/af request to a Dream request. *)
-    let httpaf_request : Httpaf.Request.t =
-      Httpaf.Reqd.request conn in
+    let httpaf_request : Dream_httpaf.Request.t =
+      Dream_httpaf.Reqd.request conn in
 
     let client =
       Adapt.address_to_string client_address in
@@ -320,22 +320,22 @@ let wrap_handler
     let version =
       (httpaf_request.version.major, httpaf_request.version.minor) in
     let headers =
-      Httpaf.Headers.to_list httpaf_request.headers in
+      Dream_httpaf.Headers.to_list httpaf_request.headers in
 
     let body =
-      Httpaf.Reqd.request_body conn in
+      Dream_httpaf.Reqd.request_body conn in
     (* TODO Review per-chunk allocations. *)
     (* TODO Should the stream be auto-closed? It doesn't even have a closed
        state. The whole thing is just a wrapper for whatever the http/af
        behavior is. *)
     let read ~data ~close ~flush:_ ~ping:_ ~pong:_ =
-      Httpaf.Body.Reader.schedule_read
+      Dream_httpaf.Body.Reader.schedule_read
         body
         ~on_eof:(fun () -> close 1000)
         ~on_read:(fun buffer ~off ~len -> data buffer off len true false)
     in
     let close _code =
-      Httpaf.Body.Reader.close body in
+      Dream_httpaf.Body.Reader.close body in
     let body =
       Stream.reader ~read ~close in
     let body =
@@ -345,7 +345,7 @@ let wrap_handler
       Server.request ~client ~method_ ~target ~https ~version ~headers body in
 
     (* Call the user's handler. If it raises an exception or returns a promise
-       that rejects with an exception, pass the exception up to Httpaf. This
+       that rejects with an exception, pass the exception up to Dream_httpaf. This
        will cause it to call its (low-level) error handler with variand `Exn _.
        A well-behaved Dream app should catch all of its own exceptions and
        rejections in one of its top-level middlewares.
@@ -370,12 +370,12 @@ let wrap_handler
               transmit the resulting error response. *)
         let forward_response response =
           let headers =
-            Httpaf.Headers.of_list (Dream.all_headers response) in
+            Dream_httpaf.Headers.of_list (Dream.all_headers response) in
 
           (* let version =
             match Dream.version_override response with
             | None -> None
-            | Some (major, minor) -> Some Httpaf.Version.{major; minor}
+            | Some (major, minor) -> Some Dream_httpaf.Version.{major; minor}
           in *)
           let status =
             to_httpaf_status (Dream.status response) in
@@ -383,9 +383,9 @@ let wrap_handler
             Dream.reason_override response in *)
 
           let httpaf_response =
-            Httpaf.Response.create ~headers status in
+            Dream_httpaf.Response.create ~headers status in
           let body =
-            Httpaf.Reqd.respond_with_streaming conn httpaf_response in
+            Dream_httpaf.Reqd.respond_with_streaming conn httpaf_response in
 
           Adapt.forward_body response body;
 
@@ -421,7 +421,7 @@ let wrap_handler
           in
 
           let headers =
-            Httpaf.Headers.of_list (Dream.all_headers response) in
+            Dream_httpaf.Headers.of_list (Dream.all_headers response) in
 
           Websocketaf.Handshake.respond_with_upgrade ~headers ~sha1 conn proceed
           |> function
@@ -437,7 +437,7 @@ let wrap_handler
       @@ fun exn ->
         (* TODO There was something in the fork changelogs about not requiring
            report exn. Is it relevant to this? *)
-        Httpaf.Reqd.report_exn conn exn;
+        Dream_httpaf.Reqd.report_exn conn exn;
         Lwt.return_unit
     end
   in
@@ -489,7 +489,7 @@ let wrap_handler_h2
       Server.request ~client ~method_ ~target ~https ~version ~headers body in
 
     (* Call the user's handler. If it raises an exception or returns a promise
-       that rejects with an exception, pass the exception up to Httpaf. This
+       that rejects with an exception, pass the exception up to Dream_httpaf. This
        will cause it to call its (low-level) error handler with variand `Exn _.
        A well-behaved Dream app should catch all of its own exceptions and
        rejections in one of its top-level middlewares.
@@ -565,7 +565,7 @@ let no_tls = {
       ~certificate_file:_ ~key_file:_
       ~handler
       ~error_handler ->
-    Httpaf_lwt_unix.Server.create_connection_handler
+    Dream_httpaf_lwt_unix.Server.create_connection_handler
       ?config:None
       ~request_handler:(wrap_handler false error_handler handler)
       ~error_handler:(Error_handler.httpaf error_handler)
@@ -579,7 +579,7 @@ let openssl = {
       ~error_handler ->
 
     let httpaf_handler =
-      Httpaf_lwt_unix.Server.SSL.create_connection_handler
+      Dream_httpaf_lwt_unix.Server.SSL.create_connection_handler
         ?config:None
       ~request_handler:(wrap_handler true error_handler handler)
       ~error_handler:(Error_handler.httpaf error_handler)
@@ -636,7 +636,7 @@ let ocaml_tls = {
       ~certificate_file ~key_file
       ~handler
       ~error_handler ->
-    Httpaf_lwt_unix.Server.TLS.create_connection_handler_with_default
+    Dream_httpaf_lwt_unix.Server.TLS.create_connection_handler_with_default
       ~certfile:certificate_file ~keyfile:key_file
       ?config:None
       ~request_handler:(wrap_handler true error_handler handler)
