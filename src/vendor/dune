@@ -12,7 +12,7 @@
   (name alpn)
   (public_name dream-mirage.dream-paf.alpn)
   (modules alpn)
-  (libraries dream-mirage.dream-paf dream.httpaf dream.h2)))
+  (libraries dream-mirage.dream-paf dream.dream-httpaf dream.h2)))
 
 (subdir paf/lib
  (library
@@ -32,27 +32,27 @@
 
 (subdir gluten/lib
  (library
-  (name gluten)
-  (public_name dream.gluten)
+  (name dream_gluten)
+  (public_name dream.dream-gluten)
   (libraries
    bigstringaf
    faraday)))
 
 (subdir gluten/lwt
  (library
-  (name gluten_lwt)
-  (public_name dream.gluten-lwt)
+  (name dream_gluten_lwt)
+  (public_name dream.dream-gluten-lwt)
   (libraries
-   dream.gluten
+   dream.dream-gluten
    lwt)))
 
 (subdir gluten/lwt-unix
  (library
-  (name gluten_lwt_unix)
-  (public_name dream.gluten-lwt-unix)
+  (name dream_gluten_lwt_unix)
+  (public_name dream.dream-gluten-lwt-unix)
   (libraries
    faraday-lwt-unix
-   dream.gluten-lwt
+   dream.dream-gluten-lwt
    lwt.unix
    (select
     ssl_io.ml
@@ -77,8 +77,8 @@
    base64
    bigstringaf
    faraday
-   dream.gluten
-   httpaf
+   dream.dream-gluten
+   dream-httpaf
    result)))
 
 (subdir websocketaf/lwt
@@ -88,7 +88,7 @@
   (libraries
    base64
    digestif.ocaml
-   dream.gluten-lwt
+   dream.dream-gluten-lwt
    lwt
    dream.websocketaf)))
 
@@ -98,7 +98,7 @@
   (public_name dream.websocketaf-lwt-unix)
   (libraries
    faraday-lwt-unix
-   dream.gluten-lwt-unix
+   dream.dream-gluten-lwt-unix
    lwt.unix
    dream.websocketaf-lwt)))
 
@@ -106,8 +106,8 @@
 
 (subdir httpaf/lib
  (library
-  (name httpaf)
-  (public_name dream.httpaf)
+  (name dream_httpaf)
+  (public_name dream.dream-httpaf)
   (libraries
    angstrom
    bigstringaf
@@ -116,23 +116,23 @@
 
 (subdir httpaf/lwt
  (library
-  (name httpaf_lwt)
-  (public_name dream.httpaf-lwt)
+  (name dream_httpaf_lwt)
+  (public_name dream.dream-httpaf-lwt)
   (libraries
-   dream.gluten
-   dream.gluten-lwt
-   dream.httpaf
+   dream.dream-gluten
+   dream.dream-gluten-lwt
+   dream.dream-httpaf
    lwt)))
 
 (subdir httpaf/lwt-unix
  (library
-  (name httpaf_lwt_unix)
-  (public_name dream.httpaf-lwt-unix)
+  (name dream_httpaf_lwt_unix)
+  (public_name dream.dream-httpaf-lwt-unix)
   (libraries
    faraday-lwt-unix
-   dream.gluten-lwt-unix
-   dream.httpaf
-   dream.httpaf-lwt
+   dream.dream-gluten-lwt-unix
+   dream.dream-httpaf
+   dream.dream-httpaf-lwt
    lwt.unix)))
 
 
@@ -168,7 +168,7 @@
    bigstringaf
    faraday
    dream.hpack
-   dream.httpaf
+   dream.dream-httpaf
    psq
    result)))
 
@@ -177,8 +177,8 @@
   (name h2_lwt)
   (public_name dream.h2-lwt)
   (libraries
-   dream.gluten
-   dream.gluten-lwt
+   dream.dream-gluten
+   dream.dream-gluten-lwt
    lwt
    dream.h2)))
 
@@ -188,7 +188,7 @@
   (public_name dream.h2-lwt-unix)
   (libraries
    faraday-lwt-unix
-   dream.gluten-lwt-unix
+   dream.dream-gluten-lwt-unix
    dream.h2
    dream.h2-lwt
    lwt.unix)))
