@@ -10,7 +10,7 @@
   dream.middleware
   dream-pure
   dream.h2
-  dream.httpaf
+  dream.dream-httpaf
   lwt
   dream-mirage.dream-paf
   dream-mirage.dream-paf.alpn
