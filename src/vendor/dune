@@ -78,7 +78,7 @@
    bigstringaf
    faraday
    dream.dream-gluten
-   dream-httpaf
+   dream.dream-httpaf
    result)))
 
 (subdir websocketaf/lwt
