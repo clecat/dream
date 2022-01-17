@@ -193,7 +193,7 @@ module Make (Pclock : Mirage_clock.PCLOCK) (Time : Mirage_time.S) (Stack : Mirag
 
   include Dream_pure.Formats
 
-  include Paf_mirage.Make (Time) (Stack)
+  include Dream_paf_mirage.Make (Time) (Stack)
 
   let alpn =
     let module R = (val Mimic.repr tls_protocol) in
