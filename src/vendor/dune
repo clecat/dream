@@ -64,7 +64,7 @@
     from
     (tls.lwt -> tls_io.real.ml)
     (-> tls_io.dummy.ml)))
-  (modules gluten_lwt_unix tls_io ssl_io)))
+  (modules dream_gluten_lwt_unix tls_io ssl_io)))
 
 
 
