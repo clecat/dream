@@ -8,11 +8,11 @@
 	branch = fork
 [submodule "src/vendor/websocketaf"]
 	path = src/vendor/websocketaf
-	url = https://github.com/aantron/websocketaf.git
+	url = https://github.com/clecat/websocketaf.git
 	branch = fork
 [submodule "src/vendor/h2"]
 	path = src/vendor/h2
-	url = https://github.com/aantron/ocaml-h2.git
+	url = https://github.com/clecat/ocaml-h2.git
 [submodule "src/vendor/paf"]
 	path = src/vendor/paf
 	url = https://github.com/clecat/paf-le-chien.git
