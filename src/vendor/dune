@@ -167,7 +167,7 @@
    base64
    bigstringaf
    faraday
-   dream.dream_hpack
+   dream.dream-hpack
    dream.dream-httpaf
    psq
    result)))
