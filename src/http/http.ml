@@ -26,7 +26,7 @@ let to_httpaf_status status =
   Dream.status_to_int status |> Dream_httpaf.Status.of_code
 
 let to_h2_status status =
-  Dream.status_to_int status |> H2.Status.of_code
+  Dream.status_to_int status |> Dream_h2.Status.of_code
 
 let sha1 s =
   s
@@ -452,12 +452,12 @@ let wrap_handler_h2
     (_user's_error_handler : Dream.error_handler)
     (user's_dream_handler : Dream.handler) =
 
-  let httpaf_request_handler = fun client_address (conn : H2.Reqd.t) ->
+  let httpaf_request_handler = fun client_address (conn : Dream_h2.Reqd.t) ->
     Dream__middleware.Log.set_up_exception_hook ();
 
     (* Covert the h2 request to a Dream request. *)
-    let httpaf_request : H2.Request.t =
-      H2.Reqd.request conn in
+    let httpaf_request : Dream_h2.Request.t =
+      Dream_h2.Reqd.request conn in
 
     let client =
       Adapt.address_to_string client_address in
@@ -468,18 +468,18 @@ let wrap_handler_h2
     let version =
       (2, 0) in
     let headers =
-      H2.Headers.to_list httpaf_request.headers in
+      Dream_h2.Headers.to_list httpaf_request.headers in
 
     let body =
-      H2.Reqd.request_body conn in
+      Dream_h2.Reqd.request_body conn in
     let read ~data ~close ~flush:_ ~ping:_ ~pong:_ =
-      H2.Body.schedule_read
+      Dream_h2.Body.schedule_read
         body
         ~on_eof:(fun () -> close 1000)
         ~on_read:(fun buffer ~off ~len -> data buffer off len true false)
     in
     let close _code =
-      H2.Body.close_reader body in
+      Dream_h2.Body.close_reader body in
     let body =
       Stream.reader ~read ~close in
     let body =
@@ -507,13 +507,13 @@ let wrap_handler_h2
 
         let forward_response response =
           let headers =
-            H2.Headers.of_list (Dream.all_headers response) in
+            Dream_h2.Headers.of_list (Dream.all_headers response) in
           let status =
             to_h2_status (Dream.status response) in
           let h2_response =
-            H2.Response.create ~headers status in
+            Dream_h2.Response.create ~headers status in
           let body =
-            H2.Reqd.respond_with_streaming conn h2_response in
+            Dream_h2.Reqd.respond_with_streaming conn h2_response in
 
           Adapt.forward_body_h2 response body;
 
@@ -524,7 +524,7 @@ let wrap_handler_h2
         | None ->
           forward_response response
 
-        (* TODO DOC H2 appears not to support WebSocket upgrade at present.
+        (* TODO DOC Dream_h2 appears not to support WebSocket upgrade at present.
            RFC 8441. *)
         (* TODO DOC Do we need a CONNECT method? Do users need to be informed of
            this? *)
@@ -535,7 +535,7 @@ let wrap_handler_h2
       @@ fun exn ->
         (* TODO LATER There was something in the fork changelogs about not
            requiring report_exn. Is it relevant to this? *)
-        H2.Reqd.report_exn conn exn;
+        Dream_h2.Reqd.report_exn conn exn;
         Lwt.return_unit
     end
   in
@@ -586,7 +586,7 @@ let openssl = {
     in
 
     let h2_handler =
-      H2_lwt_unix.Server.SSL.create_connection_handler
+      Dream_h2_lwt_unix.Server.SSL.create_connection_handler
         ?config:None
       ~request_handler:(wrap_handler_h2 true error_handler handler)
       ~error_handler:(Error_handler.h2 error_handler)

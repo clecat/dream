@@ -5,7 +5,7 @@ open Lwt.Infix
 
 let to_dream_method meth = Dream_httpaf.Method.to_string meth |> Dream.string_to_method
 let to_httpaf_status status = Dream.status_to_int status |> Dream_httpaf.Status.of_code
-let to_h2_status status = Dream.status_to_int status |> H2.Status.of_code
+let to_h2_status status = Dream.status_to_int status |> Dream_h2.Status.of_code
 let sha1 str = Digestif.SHA1.(to_raw_string (digest_string str))
 let const x = fun _ -> x
 let ( >>? ) = Lwt_result.bind
@@ -239,7 +239,7 @@ module Make (Pclock : Mirage_clock.PCLOCK) (Time : Mirage_time.S) (Stack : Mirag
 
   let alpn protocol =
     let protocol = match protocol with
-      | `H2 -> "h2"
+      | `Dream_h2 -> "h2"
       | `HTTP_1_1 -> "http/1.1" in
     let module R = (val Mimic.repr tcp_protocol) in
     let alpn _ = Some protocol in

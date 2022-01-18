@@ -361,7 +361,7 @@ let h2
       `String "Content-Length missing or negative",
       `Error,
       `Server
-      (* TODO LATER When does H2 raise `Internal_server_error? *)
+      (* TODO LATER When does Dream_h2 raise `Internal_server_error? *)
   in
 
   let error = {
@@ -385,7 +385,7 @@ let h2
         | None -> default_response caused_by
       in
 
-      let headers = H2.Headers.of_list (Dream.all_headers response) in
+      let headers = Dream_h2.Headers.of_list (Dream.all_headers response) in
       let body = start_response headers in
 
       Adapt.forward_body_h2 response body;

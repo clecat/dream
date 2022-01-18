@@ -76,11 +76,11 @@ let forward_body
 
 let forward_body_h2
     (response : Dream.response)
-    (body : [ `write ] H2.Body.t) =
+    (body : [ `write ] Dream_h2.Body.t) =
 
   forward_body_general
     response
-    (H2.Body.write_string body)
-    (H2.Body.write_bigstring body)
-    (H2.Body.flush body)
-    (fun _code -> H2.Body.close_writer body)
+    (Dream_h2.Body.write_string body)
+    (Dream_h2.Body.write_bigstring body)
+    (Dream_h2.Body.flush body)
+    (fun _code -> Dream_h2.Body.close_writer body)
