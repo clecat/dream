@@ -9,7 +9,7 @@
   dream.localhost
   dream.middleware
   dream-pure
-  dream.h2
+  dream.dream-h2
   dream.dream-httpaf
   lwt
   dream-mirage.dream-paf
