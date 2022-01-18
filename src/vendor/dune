@@ -12,7 +12,7 @@
   (name alpn)
   (public_name dream-mirage.dream-paf.alpn)
   (modules alpn)
-  (libraries dream-mirage.dream-paf dream.dream-httpaf dream.h2)))
+  (libraries dream-mirage.dream-paf dream.dream-httpaf dream.dream-h2)))
 
 (subdir paf/lib
  (library
