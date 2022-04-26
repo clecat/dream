@@ -55,6 +55,7 @@ depends: [
   "digestif" {>= "1.0.0"}
   "lwt"
   "tls-mirage"
+  "mimic"
   "mirage-time"
   "mirage-stack"
   "lwt_ppx" {>= "1.2.2"}
